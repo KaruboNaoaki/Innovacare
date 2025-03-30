@@ -446,53 +446,69 @@ def profile():
 
 @app.route('/init-db')
 def init_db():
-    """Initialize the database with sample data (for testing only)"""
+    """Initialize the database with sample data and disable 2FA for testing"""
     if not os.environ.get('ALLOW_DB_INIT'):
-        return 'Not allowed in production', 403
+        return 'Not allowed in production. Set ALLOW_DB_INIT environment variable to use this route.', 403
     
     db.create_all()
     
     # Create admin user if not exists
-    if not User.query.filter_by(username='admin').first():
+    admin = User.query.filter_by(username='admin').first()
+    if not admin:
         admin = User(username='admin', email='admin@example.com', role='admin')
         admin.set_password('admin123')
-        admin.totp_secret = pyotp.random_base32()
+        # Disable 2FA for testing by setting totp_secret to None
+        admin.totp_secret = None
         db.session.add(admin)
+    else:
+        # Update existing admin to disable 2FA
+        admin.totp_secret = None
         
-        # Create doctor user if not exists
-        if not User.query.filter_by(username='doctor').first():
-            doctor = User(username='doctor', email='doctor@example.com', role='doctor')
-            doctor.set_password('doctor123')
-            doctor.totp_secret = pyotp.random_base32()
-            db.session.add(doctor)
-        
-        # Create patient user if not exists
-        if not User.query.filter_by(username='patient').first():
-            patient_user = User(username='patient', email='patient@example.com', role='patient')
-            patient_user.set_password('patient123')
-            patient_user.totp_secret = pyotp.random_base32()
-            db.session.add(patient_user)
-            
-            # Add a patient record
-            patient = Patient()
-            patient.user_id = 3  # Will be the ID of the patient user
-            patient.first_name = "John"
-            patient.last_name = "Doe"
-            patient.dob = "1980-01-01"
-            patient.address = "123 Main St, Anytown, US"
-            patient.phone = "555-123-4567"
-            db.session.add(patient)
-        
-        db.session.commit()
-        return 'Database initialized with sample data'
+    # Create doctor user if not exists
+    doctor = User.query.filter_by(username='doctor').first()
+    if not doctor:
+        doctor = User(username='doctor', email='doctor@example.com', role='doctor')
+        doctor.set_password('doctor123')
+        # Disable 2FA for testing
+        doctor.totp_secret = None
+        db.session.add(doctor)
+    else:
+        # Update existing doctor to disable 2FA
+        doctor.totp_secret = None
     
-    return 'Database already initialized'
+    # Create patient user if not exists
+    patient_user = User.query.filter_by(username='patient').first()
+    if not patient_user:
+        patient_user = User(username='patient', email='patient@example.com', role='patient')
+        patient_user.set_password('patient123')
+        # Disable 2FA for testing
+        patient_user.totp_secret = None
+        db.session.add(patient_user)
+    else:
+        # Update existing patient to disable 2FA
+        patient_user.totp_secret = None
+        
+    # Add a patient record if it doesn't exist
+    patient = Patient.query.filter_by(user_id=patient_user.id).first()
+    if not patient:
+        patient = Patient()
+        patient.user_id = patient_user.id
+        patient.first_name = "John"
+        patient.last_name = "Doe"
+        patient.dob = "1980-01-01"
+        patient.address = "123 Main St, Anytown, US"
+        patient.phone = "555-123-4567"
+        db.session.add(patient)
+    
+    db.session.commit()
 
-if __name__ == '__main__':
-    # Create database tables if they don't exist
-    with app.app_context():
-        db.create_all()
-    
-    # Run the app with SSL (for development only)
-    # In production, use a proper WSGI server with SSL termination
-    app.run(debug=True, ssl_context='adhoc')
+    return '''
+    <h1>Database initialized with sample data</h1>
+    <p>Users created with 2FA disabled for testing:</p>
+    <ul>
+        <li><strong>Admin:</strong> username=admin, password=admin123</li>
+        <li><strong>Doctor:</strong> username=doctor, password=doctor123</li>
+        <li><strong>Patient:</strong> username=patient, password=patient123</li>
+    </ul>
+    <p><a href="/login">Go to login page</a></p>
+    '''
