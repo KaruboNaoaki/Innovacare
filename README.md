@@ -1,4 +1,4 @@
-# Navigate to backend directory
+**# Navigate to backend directory
 cd backend
 
 # Create virtual environment
@@ -39,3 +39,4 @@ npm start
 Acknowledgments
 
 This project was created as a response to the "Secure Healthcare Data Management" challenge by A Little Bit of Hope.
+**
