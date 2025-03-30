@@ -1,0 +1,328 @@
+{% extends 'base.html' %}
+
+{% block title %}Admin Dashboard - Healthcare Data Management{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="fas fa-user-shield me-2"></i>Admin Dashboard</h2>
+        <p class="text-muted">System administration and security monitoring</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card dashboard-card">
+            <div class="card-body text-center py-4">
+                <div class="icon-container">
+                    <i class="fas fa-users"></i>
+                </div>
+                <h4 class="card-title">Users</h4>
+                <p class="card-text">Manage user accounts</p>
+                <a href="#users-section" class="btn btn-primary">View Users</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card dashboard-card">
+            <div class="card-body text-center py-4">
+                <div class="icon-container">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <h4 class="card-title">Security</h4>
+                <p class="card-text">Security settings</p>
+                <a href="#security-section" class="btn btn-primary">View Security</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card dashboard-card">
+            <div class="card-body text-center py-4">
+                <div class="icon-container">
+                    <i class="fas fa-clipboard-list"></i>
+                </div>
+                <h4 class="card-title">Audit Logs</h4>
+                <p class="card-text">System activity logs</p>
+                <a href="#audit-logs-section" class="btn btn-primary">View Logs</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card dashboard-card">
+            <div class="card-body text-center py-4">
+                <div class="icon-container">
+                    <i class="fas fa-cogs"></i>
+                </div>
+                <h4 class="card-title">Settings</h4>
+                <p class="card-text">System configuration</p>
+                <a href="#" class="btn btn-primary">View Settings</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row" id="users-section">
+    <div class="col-12">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">User Management</h5>
+                <button class="btn btn-sm btn-primary">
+                    <i class="fas fa-plus me-1"></i> Add User
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="usersTable">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Last Login</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>admin</td>
+                                <td>admin@example.com</td>
+                                <td><span class="badge bg-danger">Admin</span></td>
+                                <td><span class="badge bg-success">Active</span></td>
+                                <td>2023-09-15 10:30</td>
+                                <td>
+                                    <button class="btn btn-sm btn-info me-1">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-danger">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>doctor</td>
+                                <td>doctor@example.com</td>
+                                <td><span class="badge bg-primary">Doctor</span></td>
+                                <td><span class="badge bg-success">Active</span></td>
+                                <td>2023-09-15 09:15</td>
+                                <td>
+                                    <button class="btn btn-sm btn-info me-1">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-danger">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>patient</td>
+                                <td>patient@example.com</td>
+                                <td><span class="badge bg-info">Patient</span></td>
+                                <td><span class="badge bg-success">Active</span></td>
+                                <td>2023-09-14 14:22</td>
+                                <td>
+                                    <button class="btn btn-sm btn-info me-1">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-danger">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row" id="security-section">
+    <div class="col-lg-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Security Settings</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div>
+                        <h6 class="mb-0">Require 2FA for all users</h6>
+                        <small class="text-muted">Force two-factor authentication</small>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="require2FA" checked>
+                    </div>
+                </div>
+                
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div>
+                        <h6 class="mb-0">Session Timeout</h6>
+                        <small class="text-muted">Automatically log out inactive users</small>
+                    </div>
+                    <select class="form-select" style="width: auto;">
+                        <option>15 minutes</option>
+                        <option>30 minutes</option>
+                        <option selected>60 minutes</option>
+                        <option>120 minutes</option>
+                    </select>
+                </div>
+                
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div>
+                        <h6 class="mb-0">Password Policy</h6>
+                        <small class="text-muted">Minimum password requirements</small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary">Configure</button>
+                </div>
+                
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div>
+                        <h6 class="mb-0">IP Restrictions</h6>
+                        <small class="text-muted">Limit access by IP address</small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary">Configure</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">System Health</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-3">
+                    <h6>Database Storage</h6>
+                    <span>68%</span>
+                </div>
+                <div class="progress mb-4" style="height: 10px;">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: 68%;" aria-valuenow="68" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                
+                <div class="d-flex justify-content-between mb-3">
+                    <h6>Encryption Status</h6>
+                    <span class="text-success">Active</span>
+                </div>
+                
+                <div class="d-flex justify-content-between mb-3">
+                    <h6>Last Backup</h6>
+                    <span>2023-09-15 03:00 AM</span>
+                </div>
+                
+                <div class="d-flex justify-content-between mb-3">
+                    <h6>System Version</h6>
+                    <span>1.0.0</span>
+                </div>
+                
+                <div class="d-grid gap-2 mt-4">
+                    <button class="btn btn-primary">
+                        <i class="fas fa-sync-alt me-1"></i> Backup Now
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row" id="audit-logs-section">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">HIPAA Audit Logs</h5>
+                <div class="d-flex align-items-center">
+                    <select class="form-select me-2" style="width: auto;">
+                        <option>All Actions</option>
+                        <option>View</option>
+                        <option>Create</option>
+                        <option>Update</option>
+                        <option>Delete</option>
+                    </select>
+                    <button class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-download me-1"></i> Export
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>User</th>
+                                <th>Action</th>
+                                <th>Table</th>
+                                <th>Record ID</th>
+                                <th>IP Address</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>2023-09-15 10:32:15</td>
+                                <td>doctor</td>
+                                <td>VIEW</td>
+                                <td>Patient</td>
+                                <td>1</td>
+                                <td>192.168.1.10</td>
+                                <td>
+                                    <button class="btn btn-sm btn-link">View Details</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>2023-09-15 10:35:22</td>
+                                <td>doctor</td>
+                                <td>CREATE</td>
+                                <td>MedicalRecord</td>
+                                <td>5</td>
+                                <td>192.168.1.10</td>
+                                <td>
+                                    <button class="btn btn-sm btn-link">View Details</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>2023-09-15 11:15:05</td>
+                                <td>admin</td>
+                                <td>VIEW</td>
+                                <td>User</td>
+                                <td>2</td>
+                                <td>192.168.1.5</td>
+                                <td>
+                                    <button class="btn btn-sm btn-link">View Details</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>2023-09-14 16:42:30</td>
+                                <td>patient</td>
+                                <td>VIEW</td>
+                                <td>MedicalRecord</td>
+                                <td>5</td>
+                                <td>192.168.1.20</td>
+                                <td>
+                                    <button class="btn btn-sm btn-link">View Details</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <nav aria-label="Audit log pagination">
+                    <ul class="pagination justify-content-center mt-4">
+                        <li class="page-item disabled">
+                            <a class="page-link" href="#" tabindex="-1" aria-disabled="true">Previous</a>
+                        </li>
+                        <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                        <li class="page-item"><a class="page-link" href="#">2</a></li>
+                        <li class="page-item"><a class="page-link" href="#">3</a></li>
+                        <li class="page-item">
+                            <a class="page-link" href="#">Next</a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
