@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+
+{% block title %}Doctor Dashboard - Healthcare Data Management{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="fas fa-user-md me-2"></i>Doctor Dashboard</h2>
+        <p class="text-muted">Welcome, Dr. {{ current_user.username }}. Manage your patients and records here.</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card dashboard-card">
+            <div class="card-body text-center py-4">
+                <div class="icon-container">
+                    <i class="fas fa-users"></i>
+                </div>
+                <h4 class="card-title">Patients</h4>
+                <p class="card-text">{{ patients|length if patients else 0 }} total</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card dashboard-card">
+            <div class="card-body text-center py-4">
+                <div class="icon-container">
+                    <i class="fas fa-file-medical"></i>
+                </div>
+                <h4 class="card-title">Records</h4>
+                <p class="card-text">View all records</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card dashboard-card">
+            <div class="card-body text-center py-4">
+                <div class="icon-container">
+                    <i class="fas fa-calendar-alt"></i>
+                </div>
+                <h4 class="card-title">Schedule</h4>
+                <p class="card-text">Manage appointments</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card dashboard-card">
+            <div class="card-body text-center py-4">
+                <div class="icon-container">
+                    <i class="fas fa-user-plus"></i>
+                </div>
+                <h4 class="card-title">Add Patient</h4>
+                <p class="card-text">Register new patient</p>
+                <a href="{{ url_for('add_patient') }}" class="btn btn-primary">Add New</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Patient Directory</h5>
+                <div class="input-group" style="max-width: 300px;">
+                    <input type="text" class="form-control" id="patientSearch" placeholder="Search patients...">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if patients %}
+                <div class="table-responsive">
+                    <table class="table table-hover" id="patientsTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Date of Birth</th>
+                                <th>Phone</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for patient in patients %}
+                            <tr>
+                                <td>{{ patient.first_name }} {{ patient.last_name }}</td>
+                                <td>{{ patient.dob }}</td>
+                                <td>{{ patient.phone }}</td>
+                                <td>
+                                    <a href="{{ url_for('view_patient', patient_id=patient.id) }}" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-eye me-1"></i> View
+                                    </a>
+                                    <a href="{{ url_for('add_medical_record', patient_id=patient.id) }}" class="btn btn-sm btn-secondary">
+                                        <i class="fas fa-plus me-1"></i> Add Record
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info mb-0">
+                    <i class="fas fa-info-circle me-2"></i> No patients found. <a href="{{ url_for('add_patient') }}">Add a new patient</a>.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Simple client-side search functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('patientSearch');
+        const table = document.getElementById('patientsTable');
+        
+        if (searchInput && table) {
+            searchInput.addEventListener('keyup', function() {
+                const searchValue = this.value.toLowerCase();
+                const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+                
+                for (let i = 0; i < rows.length; i++) {
+                    const rowText = rows[i].textContent.toLowerCase();
+                    if (rowText.includes(searchValue)) {
+                        rows[i].style.display = '';
+                    } else {
+                        rows[i].style.display = 'none';
+                    }
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}
