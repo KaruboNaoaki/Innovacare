@@ -92,7 +92,7 @@
                                 <td>admin@example.com</td>
                                 <td><span class="badge bg-danger">Admin</span></td>
                                 <td><span class="badge bg-success">Active</span></td>
-                                <td>2023-09-15 10:30</td>
+                                <td>{{ now.strftime('%Y-%m-%d %H:%M') }}</td>
                                 <td>
                                     <button class="btn btn-sm btn-info me-1">
                                         <i class="fas fa-edit"></i>
@@ -107,7 +107,7 @@
                                 <td>doctor@example.com</td>
                                 <td><span class="badge bg-primary">Doctor</span></td>
                                 <td><span class="badge bg-success">Active</span></td>
-                                <td>2023-09-15 09:15</td>
+                                <td>{{ now.strftime('%Y-%m-%d %H:%M') }}</td>
                                 <td>
                                     <button class="btn btn-sm btn-info me-1">
                                         <i class="fas fa-edit"></i>
@@ -122,7 +122,7 @@
                                 <td>patient@example.com</td>
                                 <td><span class="badge bg-info">Patient</span></td>
                                 <td><span class="badge bg-success">Active</span></td>
-                                <td>2023-09-14 14:22</td>
+                                <td>{{ now.strftime('%Y-%m-%d %H:%M') }}</td>
                                 <td>
                                     <button class="btn btn-sm btn-info me-1">
                                         <i class="fas fa-edit"></i>
@@ -210,7 +210,7 @@
                 
                 <div class="d-flex justify-content-between mb-3">
                     <h6>Last Backup</h6>
-                    <span>2023-09-15 03:00 AM</span>
+                    <span>{{ now.strftime('%Y-%m-%d %H:%M') }}</span>
                 </div>
                 
                 <div class="d-flex justify-content-between mb-3">
@@ -262,7 +262,7 @@
                         </thead>
                         <tbody>
                             <tr>
-                                <td>2023-09-15 10:32:15</td>
+                                <td>{{ now.strftime('%Y-%m-%d %H:%M:%S') }}</td>
                                 <td>doctor</td>
                                 <td>VIEW</td>
                                 <td>Patient</td>
@@ -273,7 +273,7 @@
                                 </td>
                             </tr>
                             <tr>
-                                <td>2023-09-15 10:35:22</td>
+                                <td>{{ now.strftime('%Y-%m-%d %H:%M:%S') }}</td>
                                 <td>doctor</td>
                                 <td>CREATE</td>
                                 <td>MedicalRecord</td>
@@ -284,7 +284,7 @@
                                 </td>
                             </tr>
                             <tr>
-                                <td>2023-09-15 11:15:05</td>
+                                <td>{{ now.strftime('%Y-%m-%d %H:%M:%S') }}</td>
                                 <td>admin</td>
                                 <td>VIEW</td>
                                 <td>User</td>
@@ -295,7 +295,7 @@
                                 </td>
                             </tr>
                             <tr>
-                                <td>2023-09-14 16:42:30</td>
+                                <td>{{ (now - timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S') }}</td>
                                 <td>patient</td>
                                 <td>VIEW</td>
                                 <td>MedicalRecord</td>
