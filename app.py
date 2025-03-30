@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.middleware.proxy_fix import ProxyFix
 from datetime import datetime, timedelta
 import os
 import pyotp
@@ -13,13 +14,23 @@ import logging
 import traceback
 from cryptography.fernet import Fernet
 import functools
+import ssl
+import secrets
 
 # App configuration
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev_secret_key_for_testing')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///healthcare.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=1)
+
+# Secure cookies
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+# Fix for proper HTTPS handling behind proxies
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1)
 
 # Setup database
 db = SQLAlchemy(app)
@@ -37,12 +48,58 @@ logging.basicConfig(
 )
 logger = logging.getLogger('hipaa_compliance')
 
-# Encryption setup - FIXED to use a consistent key for development
-DEFAULT_KEY = b'tgUHCcmmL5UWmjq2zZh61twDxNrIi6C5F_T-kv46y-o='  # Only for development!
-ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY', DEFAULT_KEY)
-if isinstance(ENCRYPTION_KEY, str):
-    ENCRYPTION_KEY = ENCRYPTION_KEY.encode()
-cipher_suite = Fernet(ENCRYPTION_KEY)
+# Encryption setup with improved key management
+def get_or_create_encryption_key():
+    """Get encryption key from environment or create and store it in a file"""
+    key_from_env = os.environ.get('ENCRYPTION_KEY')
+    
+    if key_from_env:
+        # Use the key from environment variable if available
+        if isinstance(key_from_env, str):
+            try:
+                return base64.urlsafe_b64decode(key_from_env.encode())
+            except:
+                logger.error("Invalid ENCRYPTION_KEY format in environment variable")
+                raise ValueError("ENCRYPTION_KEY must be a valid base64-encoded string")
+        return key_from_env
+    
+    # Key file path
+    key_file = os.path.join(os.getcwd(), 'instance', 'encryption.key')
+    
+    # Ensure the instance directory exists
+    os.makedirs(os.path.dirname(key_file), exist_ok=True)
+    
+    # Check if key file exists
+    if os.path.exists(key_file):
+        # Read existing key
+        with open(key_file, 'rb') as f:
+            key_data = f.read()
+            try:
+                return base64.urlsafe_b64decode(key_data)
+            except:
+                logger.error("Invalid encryption key format in key file")
+                # Generate new key if the existing one is invalid
+                os.remove(key_file)
+                return get_or_create_encryption_key()
+    else:
+        # Generate a new key
+        key = base64.urlsafe_b64encode(secrets.token_bytes(32))
+        
+        # Save the key to file with restricted permissions
+        with open(key_file, 'wb') as f:
+            f.write(key)
+        
+        # Set permissions on key file (Unix/Linux only)
+        try:
+            os.chmod(key_file, 0o600)  # Only owner can read/write
+        except:
+            pass  # Ignore on Windows
+            
+        return base64.urlsafe_b64decode(key)
+
+# Initialize encryption key
+ENCRYPTION_KEY = get_or_create_encryption_key()
+cipher_suite = Fernet(base64.urlsafe_b64encode(ENCRYPTION_KEY))
 
 def encrypt_data(data):
     """Encrypt sensitive data"""
@@ -55,6 +112,65 @@ def decrypt_data(data):
     if data is None:
         return None
     return cipher_suite.decrypt(data.encode()).decode()
+
+# SSL Certificate Generation
+def generate_self_signed_cert():
+    """Generate a self-signed certificate for development HTTPS"""
+    cert_dir = os.path.join(os.getcwd(), 'certificates')
+    cert_file = os.path.join(cert_dir, 'cert.pem')
+    key_file = os.path.join(cert_dir, 'key.pem')
+    
+    # If certificates already exist, return their paths
+    if os.path.exists(cert_file) and os.path.exists(key_file):
+        return cert_file, key_file
+    
+    # Ensure certificates directory exists
+    os.makedirs(cert_dir, exist_ok=True)
+    
+    # Generate certificates using OpenSSL command
+    try:
+        from OpenSSL import crypto
+        
+        # Create a key pair
+        k = crypto.PKey()
+        k.generate_key(crypto.TYPE_RSA, 2048)
+        
+        # Create a self-signed cert
+        cert = crypto.X509()
+        cert.get_subject().C = "US"
+        cert.get_subject().ST = "State"
+        cert.get_subject().L = "City"
+        cert.get_subject().O = "Healthcare App"
+        cert.get_subject().OU = "IT Department"
+        cert.get_subject().CN = "localhost"
+        cert.set_serial_number(1000)
+        cert.gmtime_adj_notBefore(0)
+        cert.gmtime_adj_notAfter(10*365*24*60*60)  # 10 years validity
+        cert.set_issuer(cert.get_subject())
+        cert.set_pubkey(k)
+        cert.sign(k, 'sha256')
+        
+        # Write the certificate and private key to files
+        with open(cert_file, "wb") as f:
+            f.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
+        
+        with open(key_file, "wb") as f:
+            f.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, k))
+        
+        # Set permissions on key file (Unix/Linux only)
+        try:
+            os.chmod(key_file, 0o600)  # Only owner can read/write
+        except:
+            pass  # Ignore on Windows
+            
+        return cert_file, key_file
+        
+    except ImportError:
+        logger.error("PyOpenSSL not installed. Cannot generate certificates automatically.")
+        return None, None
+    except Exception as e:
+        logger.error(f"Error generating certificates: {e}")
+        return None, None
 
 # Models
 class User(db.Model, UserMixin):
@@ -185,6 +301,40 @@ class AuditLog(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+# Security headers
+@app.after_request
+def add_security_headers(response):
+    """Add security headers to every response"""
+    # Enable HTTP Strict Transport Security (HSTS)
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    
+    # Prevent clickjacking
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    
+    # Help prevent XSS
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    
+    # Basic Content Security Policy
+    csp = ("default-src 'self'; "
+           "script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+           "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+           "font-src 'self' https://cdnjs.cloudflare.com; "
+           "img-src 'self' data:; "
+           "frame-src 'self'")
+    response.headers['Content-Security-Policy'] = csp
+    
+    return response
+
+# Force HTTPS
+@app.before_request
+def redirect_to_https():
+    """Redirect HTTP requests to HTTPS"""
+    # Only when not in debug mode and not already HTTPS
+    if not app.debug and not request.is_secure:
+        url = request.url.replace('http://', 'https://', 1)
+        return redirect(url, code=301)
+
 # Decorator for role-based access control
 def role_required(roles):
     def decorator(f):
@@ -240,9 +390,15 @@ def login():
                 login_user(user)
                 user.last_login = datetime.utcnow()
                 db.session.commit()
+                
+                # Log the successful login
+                log_action('LOGIN', 'User', user.id, 'Direct login successful')
+                
                 flash('Login successful!', 'success')
                 return redirect(url_for('dashboard'))
         else:
+            # Log failed login attempt
+            logger.warning(f'Failed login attempt for username: {username} from IP: {request.remote_addr}')
             flash('Invalid username or password', 'danger')
     
     return render_template('login.html')
@@ -262,9 +418,16 @@ def verify_2fa():
             user.last_login = datetime.utcnow()
             db.session.commit()
             session.pop('user_id_for_2fa', None)
+            
+            # Log the successful 2FA login
+            log_action('LOGIN', 'User', user.id, '2FA login successful')
+            
             flash('Two-factor authentication successful!', 'success')
             return redirect(url_for('dashboard'))
         else:
+            # Log failed 2FA attempt
+            if user:
+                logger.warning(f'Failed 2FA attempt for user: {user.username} from IP: {request.remote_addr}')
             flash('Invalid verification code', 'danger')
     
     return render_template('verify_2fa.html')
@@ -300,6 +463,9 @@ def register():
         
         # Store user ID for setup 2FA page
         session['user_id_for_2fa_setup'] = user.id
+        
+        # Log new user registration
+        logger.info(f'New user registered: {username} (ID: {user.id}) from IP: {request.remote_addr}')
         
         flash('Registration successful! Please set up two-factor authentication.', 'success')
         return redirect(url_for('setup_2fa'))
@@ -341,6 +507,10 @@ def complete_2fa_setup():
     
     if user.verify_totp(totp_code):
         session.pop('user_id_for_2fa_setup', None)
+        
+        # Log successful 2FA setup
+        logger.info(f'User {user.username} (ID: {user.id}) completed 2FA setup')
+        
         flash('Two-factor authentication set up successfully!', 'success')
         return redirect(url_for('login'))
     else:
@@ -353,7 +523,6 @@ def dashboard():
     # Get current datetime for templates
     current_datetime = datetime.now()
     
-    # Different dashboards based on user role
     if current_user.role == 'admin':
         return render_template('admin_dashboard.html', now=current_datetime, timedelta=timedelta)
     elif current_user.role == 'doctor':
@@ -402,6 +571,7 @@ def add_patient():
             return redirect(url_for('dashboard'))
         except Exception as e:
             db.session.rollback()
+            logger.error(f'Error adding patient: {str(e)}\n{traceback.format_exc()}')
             flash(f'Error adding patient: {str(e)}', 'danger')
     
     return render_template('add_patient.html', now=datetime.now())
@@ -432,6 +602,7 @@ def add_medical_record(patient_id):
             return redirect(url_for('view_patient', patient_id=patient_id))
         except Exception as e:
             db.session.rollback()
+            logger.error(f'Error adding medical record: {str(e)}\n{traceback.format_exc()}')
             flash(f'Error adding medical record: {str(e)}', 'danger')
     
     return render_template('add_medical_record.html', patient=patient, now=datetime.now())
@@ -439,7 +610,13 @@ def add_medical_record(patient_id):
 @app.route('/logout')
 @login_required
 def logout():
+    user_id = current_user.id
+    user_name = current_user.username
     logout_user()
+    
+    # Log the logout action
+    logger.info(f'User logged out: {user_name} (ID: {user_id}) from IP: {request.remote_addr}')
+    
     flash('You have been logged out.', 'info')
     return redirect(url_for('index'))
 
@@ -512,7 +689,11 @@ def init_db():
         # Commit all changes
         db.session.commit()
 
-        return '''
+        # Determine the port for the proper link
+        port = "8443" if os.path.exists(os.path.join(os.getcwd(), 'certificates', 'cert.pem')) else "8080"
+        protocol = "https" if port == "8443" else "http"
+
+        return f'''
         <h1>Database initialized with sample data</h1>
         <p>Users created with 2FA disabled for testing:</p>
         <ul>
@@ -520,8 +701,8 @@ def init_db():
             <li><strong>Doctor:</strong> username=doctor, password=doctor123</li>
             <li><strong>Patient:</strong> username=patient, password=patient123</li>
         </ul>
-        <p><a href="/login">Go to login page</a></p>
-        <p><small>Note: The application is now running on port 8080 instead of port 5000</small></p>
+        <p><a href="{protocol}://localhost:{port}/login">Go to login page</a></p>
+        <p><small>Note: The application is running on port {port} with {protocol.upper()}</small></p>
         '''
     except Exception as e:
         # Return debug information
@@ -537,22 +718,116 @@ def debug_info():
     """Debug information route for development only"""
     info = {
         "Python version": os.sys.version,
-        "Flask version": "Flask " + Flask.__version__,
+        "Flask version": Flask.__version__,
         "Database URI": app.config['SQLALCHEMY_DATABASE_URI'],
         "Secret Key Set": bool(app.config['SECRET_KEY']),
         "Working Directory": os.getcwd(),
         "Templates Folder": os.path.isdir(os.path.join(os.getcwd(), 'templates')),
         "Static Folder": os.path.isdir(os.path.join(os.getcwd(), 'static')),
-        "Environment Variables": {k: v for k, v in os.environ.items() if k in ['FLASK_APP', 'FLASK_ENV', 'SECRET_KEY', 'ALLOW_DB_INIT']}
+        "HTTPS Enabled": os.path.exists(os.path.join(os.getcwd(), 'certificates', 'cert.pem')),
+        "Encryption Key Source": "Environment" if os.environ.get('ENCRYPTION_KEY') else "File",
+        "Environment Variables": {k: "[REDACTED]" for k in ['FLASK_APP', 'FLASK_ENV', 'SECRET_KEY', 'ENCRYPTION_KEY']}
     }
     
     return jsonify(info)
+
+# Add a route to check the encryption status
+@app.route('/encryption-check')
+@login_required
+@role_required(['admin'])
+def encryption_check():
+    """Check encryption status for admins"""
+    try:
+        # Test encryption and decryption
+        test_data = "ENCRYPTION_TEST_" + secrets.token_hex(8)
+        encrypted = encrypt_data(test_data)
+        decrypted = decrypt_data(encrypted)
+        
+        encryption_ok = (test_data == decrypted)
+        
+        # Get key info
+        key_source = "Environment variable" if os.environ.get('ENCRYPTION_KEY') else "Local file"
+        key_file = os.path.join(os.getcwd(), 'instance', 'encryption.key')
+        key_file_exists = os.path.exists(key_file)
+        
+        # Certificates info
+        cert_file = os.path.join(os.getcwd(), 'certificates', 'cert.pem')
+        key_file_ssl = os.path.join(os.getcwd(), 'certificates', 'key.pem')
+        ssl_configured = os.path.exists(cert_file) and os.path.exists(key_file_ssl)
+        
+        # Get audit log count
+        audit_log_count = AuditLog.query.count()
+        
+        return jsonify({
+            "encryption_status": "OK" if encryption_ok else "FAILED",
+            "encryption_key_source": key_source,
+            "key_file_exists": key_file_exists,
+            "ssl_configured": ssl_configured,
+            "https_enabled": request.is_secure,
+            "audit_log_count": audit_log_count,
+            "security_headers": {
+                "HSTS": "Enabled",
+                "CSP": "Enabled",
+                "XSS-Protection": "Enabled",
+                "Content-Type-Options": "Enabled",
+                "Frame-Options": "Enabled"
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            "encryption_status": "ERROR",
+            "error": str(e)
+        }), 500
+
+# Security breach detection
+@app.before_request
+def detect_security_breaches():
+    """Detect potential security breaches"""
+    # Check for suspicious user agents
+    user_agent = request.headers.get('User-Agent', '').lower()
+    suspicious_agents = ['sqlmap', 'nikto', 'nmap', 'dirbuster', 'metasploit']
+    
+    if any(agent in user_agent for agent in suspicious_agents):
+        logger.warning(f"Potential security scan detected: {request.remote_addr} - {user_agent}")
+        
+    # Check for SQL injection attempts in parameters
+    sql_patterns = ["'--", "DROP TABLE", "1=1", "OR 1=1", "UNION SELECT", ";--"]
+    for key, value in request.values.items():
+        if isinstance(value, str) and any(pattern.lower() in value.lower() for pattern in sql_patterns):
+            logger.warning(f"Potential SQL injection: {request.remote_addr} - {key}={value}")
+            return "Invalid request", 403
+
+# Error handlers for improved security (don't leak information)
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html'), 404
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    logger.error(f"Internal server error: {str(e)}")
+    return render_template('500.html'), 500
+
+@app.errorhandler(403)
+def forbidden(e):
+    return render_template('403.html'), 403
 
 if __name__ == '__main__':
     # Create database tables if they don't exist
     with app.app_context():
         db.create_all()
     
-    # Run the app on 0.0.0.0 (all network interfaces) instead of 127.0.0.1
-    # Using port 8080 instead of 5000
-    app.run(debug=True, host='0.0.0.0', port=8080)
+    # Generate SSL certificates if needed
+    cert_file, key_file = generate_self_signed_cert()
+    
+    # Check if certificates are available
+    if cert_file and key_file:
+        # Run with HTTPS on port 8443
+        print("Running with HTTPS on port 8443")
+        # For production, set debug=False
+        app.run(debug=True, host='0.0.0.0', port=8443, 
+                ssl_context=(cert_file, key_file))
+    else:
+        # Fallback to HTTP (not recommended for production)
+        print("WARNING: Running without HTTPS! Install PyOpenSSL for secure HTTPS.")
+        print("Install with: pip install pyopenssl")
+        app.run(debug=True, host='0.0.0.0', port=8080)
