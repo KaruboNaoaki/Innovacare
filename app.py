@@ -757,7 +757,7 @@ def migrate_data():
                 
                 records_migrated += 1
             except Exception as e:
-logger.error(f"Failed to migrate record {record.id}: {e}")
+                logger.error(f"Failed to migrate record {record.id}: {e}")
                 records_failed += 1
         
         # Commit all changes
