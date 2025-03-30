@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Healthcare Data Management{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="fas fa-columns me-2"></i>Dashboard</h2>
+        <p class="text-muted">Welcome back, {{ current_user.username }}. Here's your health data dashboard.</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card dashboard-card">
+            <div class="card-body text-center py-4">
+                <div class="icon-container">
+                    <i class="fas fa-user-md"></i>
+                </div>
+                <h4 class="card-title">Your Profile</h4>
+                <p class="card-text">View and manage your personal information</p>
+                <a href="{{ url_for('profile') }}" class="btn btn-primary">View Profile</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card dashboard-card">
+            <div class="card-body text-center py-4">
+                <div class="icon-container">
+                    <i class="fas fa-notes-medical"></i>
+                </div>
+                <h4 class="card-title">Medical Records</h4>
+                <p class="card-text">Access your secure health records</p>
+                <a href="#" class="btn btn-primary">View Records</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card dashboard-card">
+            <div class="card-body text-center py-4">
+                <div class="icon-container">
+                    <i class="fas fa-key"></i>
+                </div>
+                <h4 class="card-title">Security Settings</h4>
+                <p class="card-text">Manage your security preferences</p>
+                <a href="#" class="btn btn-primary">Security Settings</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between">
+                <h5 class="mb-0">Recent Activity</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Activity</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>{{ now.strftime('%Y-%m-%d') }}</td>
+                                <td>System Login</td>
+                                <td><span class="badge bg-success">Successful</span></td>
+                            </tr>
+                            <tr>
+                                <td>{{ now.strftime('%Y-%m-%d') }}</td>
+                                <td>Profile Viewed</td>
+                                <td><span class="badge bg-primary">Info</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">HIPAA Compliance</h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-3">Remember these important security practices:</p>
+                <ul class="list-unstyled">
+                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Log out when you're done</li>
+                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Never share your credentials</li>
+                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Keep 2FA device secure</li>
+                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Report security incidents</li>
+                </ul>
+                <div class="alert alert-info mt-3 mb-0">
+                    <i class="fas fa-info-circle me-2"></i> All system activities are logged for HIPAA compliance.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Add dashboard specific scripts here
+</script>
+{% endblock %}
