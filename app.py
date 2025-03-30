@@ -521,6 +521,7 @@ def init_db():
             <li><strong>Patient:</strong> username=patient, password=patient123</li>
         </ul>
         <p><a href="/login">Go to login page</a></p>
+        <p><small>Note: The application is now running on port 8080 instead of port 5000</small></p>
         '''
     except Exception as e:
         # Return debug information
@@ -552,5 +553,6 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
     
-    # Run the app without SSL for easier debugging
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Run the app on 0.0.0.0 (all network interfaces) instead of 127.0.0.1
+    # Using port 8080 instead of 5000
+    app.run(debug=True, host='0.0.0.0', port=8080)
