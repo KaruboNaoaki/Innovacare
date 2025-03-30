@@ -346,22 +346,25 @@ def complete_2fa_setup():
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    # Get current datetime for templates
+    current_datetime = datetime.now()
+    
     # Different dashboards based on user role
     if current_user.role == 'admin':
-        return render_template('admin_dashboard.html')
+        return render_template('admin_dashboard.html', now=current_datetime)
     elif current_user.role == 'doctor':
         patients = Patient.query.all()
         log_action('VIEW', 'Patient', 0, 'Listed all patients')
-        return render_template('doctor_dashboard.html', patients=patients)
+        return render_template('doctor_dashboard.html', patients=patients, now=current_datetime)
     elif current_user.role == 'patient':
         patient = Patient.query.filter_by(user_id=current_user.id).first()
         medical_records = []
         if patient:
             medical_records = MedicalRecord.query.filter_by(patient_id=patient.id).all()
             log_action('VIEW', 'MedicalRecord', patient.id, 'Viewed own medical records')
-        return render_template('patient_dashboard.html', patient=patient, medical_records=medical_records)
+        return render_template('patient_dashboard.html', patient=patient, medical_records=medical_records, now=current_datetime)
     else:
-        return render_template('dashboard.html')
+        return render_template('dashboard.html', now=current_datetime)
 
 @app.route('/patient/<int:patient_id>')
 @login_required
@@ -371,7 +374,7 @@ def view_patient(patient_id):
     medical_records = MedicalRecord.query.filter_by(patient_id=patient_id).all()
     
     log_action('VIEW', 'Patient', patient_id, f'Viewed patient details')
-    return render_template('patient_detail.html', patient=patient, medical_records=medical_records)
+    return render_template('patient_detail.html', patient=patient, medical_records=medical_records, now=datetime.now())
 
 @app.route('/patient/add', methods=['GET', 'POST'])
 @login_required
@@ -397,7 +400,7 @@ def add_patient():
             db.session.rollback()
             flash(f'Error adding patient: {str(e)}', 'danger')
     
-    return render_template('add_patient.html')
+    return render_template('add_patient.html', now=datetime.now())
 
 @app.route('/medical-record/add/<int:patient_id>', methods=['GET', 'POST'])
 @login_required
@@ -427,7 +430,7 @@ def add_medical_record(patient_id):
             db.session.rollback()
             flash(f'Error adding medical record: {str(e)}', 'danger')
     
-    return render_template('add_medical_record.html', patient=patient)
+    return render_template('add_medical_record.html', patient=patient, now=datetime.now())
 
 @app.route('/logout')
 @login_required
@@ -439,7 +442,7 @@ def logout():
 @app.route('/profile')
 @login_required
 def profile():
-    return render_template('profile.html')
+    return render_template('profile.html', now=datetime.now())
 
 @app.route('/init-db')
 def init_db():
