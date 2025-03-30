@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{% block title %}Register - Healthcare Data Management{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6 mx-auto">
+        <div class="card auth-card">
+            <div class="card-body">
+                <div class="auth-header">
+                    <div class="auth-icon mb-3">
+                        <i class="fas fa-user-plus"></i>
+                    </div>
+                    <h3 class="card-title">Create an Account</h3>
+                    <p class="text-muted">Register to access the secure healthcare system</p>
+                </div>
+                
+                <form method="POST" action="{{ url_for('register') }}">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-user"></i></span>
+                            <input type="text" class="form-control" id="username" name="username" required>
+                        </div>
+                        <div class="form-text">Choose a unique username (letters and numbers only)</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email Address</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                            <input type="email" class="form-control" id="email" name="email" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                            <input type="password" class="form-control" id="password" name="password" 
+                                   pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}" required>
+                        </div>
+                        <div class="form-text">Must be at least 8 characters with numbers, uppercase and lowercase letters</div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="confirm_password" class="form-label">Confirm Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info mb-4">
+                        <small>
+                            <strong>Important:</strong> After registration, you'll need to set up two-factor authentication using
+                            an authenticator app like Google Authenticator or Authy.
+                        </small>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">Create Account</button>
+                    </div>
+                </form>
+                
+                <div class="mt-4 text-center">
+                    <p>Already have an account? <a href="{{ url_for('login') }}">Login here</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Password validation and confirmation check
+    document.addEventListener('DOMContentLoaded', function() {
+        const password = document.getElementById('password');
+        const confirmPassword = document.getElementById('confirm_password');
+        
+        function validatePassword() {
+            if (password.value != confirmPassword.value) {
+                confirmPassword.setCustomValidity("Passwords don't match");
+            } else {
+                confirmPassword.setCustomValidity('');
+            }
+        }
+        
+        password.addEventListener('change', validatePassword);
+        confirmPassword.addEventListener('keyup', validatePassword);
+    });
+</script>
+{% endblock %}
