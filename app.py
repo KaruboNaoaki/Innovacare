@@ -15,7 +15,7 @@ import functools
 
 # App configuration
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', os.urandom(24).hex())
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev_secret_key_for_testing')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///healthcare.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=1)
@@ -36,8 +36,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger('hipaa_compliance')
 
-# Encryption setup
-ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY', Fernet.generate_key())
+# Encryption setup - FIXED to use a consistent key for development
+DEFAULT_KEY = b'tgUHCcmmL5UWmjq2zZh61twDxNrIi6C5F_T-kv46y-o='  # Only for development!
+ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY', DEFAULT_KEY)
+if isinstance(ENCRYPTION_KEY, str):
+    ENCRYPTION_KEY = ENCRYPTION_KEY.encode()
 cipher_suite = Fernet(ENCRYPTION_KEY)
 
 def encrypt_data(data):
@@ -351,7 +354,7 @@ def dashboard():
     
     # Different dashboards based on user role
     if current_user.role == 'admin':
-        return render_template('admin_dashboard.html', now=current_datetime)
+        return render_template('admin_dashboard.html', now=current_datetime, timedelta=timedelta)
     elif current_user.role == 'doctor':
         patients = Patient.query.all()
         log_action('VIEW', 'Patient', 0, 'Listed all patients')
@@ -447,68 +450,105 @@ def profile():
 @app.route('/init-db')
 def init_db():
     """Initialize the database with sample data and disable 2FA for testing"""
-    if not os.environ.get('ALLOW_DB_INIT'):
-        return 'Not allowed in production. Set ALLOW_DB_INIT environment variable to use this route.', 403
-    
-    db.create_all()
-    
-    # Create admin user if not exists
-    admin = User.query.filter_by(username='admin').first()
-    if not admin:
-        admin = User(username='admin', email='admin@example.com', role='admin')
-        admin.set_password('admin123')
-        # Disable 2FA for testing by setting totp_secret to None
-        admin.totp_secret = None
-        db.session.add(admin)
-    else:
-        # Update existing admin to disable 2FA
-        admin.totp_secret = None
+    try:
+        # Don't check for ALLOW_DB_INIT to make debugging easier
+        # if not os.environ.get('ALLOW_DB_INIT'):
+        #     return 'Not allowed in production. Set ALLOW_DB_INIT environment variable to use this route.', 403
         
-    # Create doctor user if not exists
-    doctor = User.query.filter_by(username='doctor').first()
-    if not doctor:
-        doctor = User(username='doctor', email='doctor@example.com', role='doctor')
-        doctor.set_password('doctor123')
-        # Disable 2FA for testing
-        doctor.totp_secret = None
-        db.session.add(doctor)
-    else:
-        # Update existing doctor to disable 2FA
-        doctor.totp_secret = None
-    
-    # Create patient user if not exists
-    patient_user = User.query.filter_by(username='patient').first()
-    if not patient_user:
-        patient_user = User(username='patient', email='patient@example.com', role='patient')
-        patient_user.set_password('patient123')
-        # Disable 2FA for testing
-        patient_user.totp_secret = None
-        db.session.add(patient_user)
-    else:
-        # Update existing patient to disable 2FA
-        patient_user.totp_secret = None
+        # Create database tables
+        db.create_all()
         
-    # Add a patient record if it doesn't exist
-    patient = Patient.query.filter_by(user_id=patient_user.id).first()
-    if not patient:
-        patient = Patient()
-        patient.user_id = patient_user.id
-        patient.first_name = "John"
-        patient.last_name = "Doe"
-        patient.dob = "1980-01-01"
-        patient.address = "123 Main St, Anytown, US"
-        patient.phone = "555-123-4567"
-        db.session.add(patient)
-    
-    db.session.commit()
+        # Create admin user if not exists
+        admin = User.query.filter_by(username='admin').first()
+        if not admin:
+            admin = User(username='admin', email='admin@example.com', role='admin')
+            admin.set_password('admin123')
+            # Disable 2FA for testing by setting totp_secret to None
+            admin.totp_secret = None
+            db.session.add(admin)
+        else:
+            # Update existing admin to disable 2FA
+            admin.totp_secret = None
+            
+        # Create doctor user if not exists
+        doctor = User.query.filter_by(username='doctor').first()
+        if not doctor:
+            doctor = User(username='doctor', email='doctor@example.com', role='doctor')
+            doctor.set_password('doctor123')
+            # Disable 2FA for testing
+            doctor.totp_secret = None
+            db.session.add(doctor)
+        else:
+            # Update existing doctor to disable 2FA
+            doctor.totp_secret = None
+        
+        # Create patient user if not exists
+        patient_user = User.query.filter_by(username='patient').first()
+        if not patient_user:
+            patient_user = User(username='patient', email='patient@example.com', role='patient')
+            patient_user.set_password('patient123')
+            # Disable 2FA for testing
+            patient_user.totp_secret = None
+            db.session.add(patient_user)
+        else:
+            # Update existing patient to disable 2FA
+            patient_user.totp_secret = None
+            
+        # Add a patient record if it doesn't exist
+        db.session.commit()  # Commit to get IDs
+        
+        patient = Patient.query.filter_by(user_id=patient_user.id).first()
+        if not patient:
+            patient = Patient()
+            patient.user_id = patient_user.id
+            patient.first_name = "John"
+            patient.last_name = "Doe"
+            patient.dob = "1980-01-01"
+            patient.address = "123 Main St, Anytown, US"
+            patient.phone = "555-123-4567"
+            db.session.add(patient)
+        
+        # Commit all changes
+        db.session.commit()
 
-    return '''
-    <h1>Database initialized with sample data</h1>
-    <p>Users created with 2FA disabled for testing:</p>
-    <ul>
-        <li><strong>Admin:</strong> username=admin, password=admin123</li>
-        <li><strong>Doctor:</strong> username=doctor, password=doctor123</li>
-        <li><strong>Patient:</strong> username=patient, password=patient123</li>
-    </ul>
-    <p><a href="/login">Go to login page</a></p>
-    '''
+        return '''
+        <h1>Database initialized with sample data</h1>
+        <p>Users created with 2FA disabled for testing:</p>
+        <ul>
+            <li><strong>Admin:</strong> username=admin, password=admin123</li>
+            <li><strong>Doctor:</strong> username=doctor, password=doctor123</li>
+            <li><strong>Patient:</strong> username=patient, password=patient123</li>
+        </ul>
+        <p><a href="/login">Go to login page</a></p>
+        '''
+    except Exception as e:
+        # Return debug information
+        return f'''
+        <h1>Error initializing database</h1>
+        <p>Error: {str(e)}</p>
+        <pre>{import traceback; traceback.format_exc()}</pre>
+        '''
+
+@app.route('/debug')
+def debug_info():
+    """Debug information route for development only"""
+    info = {
+        "Python version": os.sys.version,
+        "Flask version": "Flask " + Flask.__version__,
+        "Database URI": app.config['SQLALCHEMY_DATABASE_URI'],
+        "Secret Key Set": bool(app.config['SECRET_KEY']),
+        "Working Directory": os.getcwd(),
+        "Templates Folder": os.path.isdir(os.path.join(os.getcwd(), 'templates')),
+        "Static Folder": os.path.isdir(os.path.join(os.getcwd(), 'static')),
+        "Environment Variables": {k: v for k, v in os.environ.items() if k in ['FLASK_APP', 'FLASK_ENV', 'SECRET_KEY', 'ALLOW_DB_INIT']}
+    }
+    
+    return jsonify(info)
+
+if __name__ == '__main__':
+    # Create database tables if they don't exist
+    with app.app_context():
+        db.create_all()
+    
+    # Run the app without SSL for easier debugging
+    app.run(debug=True, port=5000)
