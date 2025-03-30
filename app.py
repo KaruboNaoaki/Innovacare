@@ -10,6 +10,7 @@ from io import BytesIO
 import base64
 import uuid
 import logging
+import traceback
 from cryptography.fernet import Fernet
 import functools
 
@@ -523,10 +524,11 @@ def init_db():
         '''
     except Exception as e:
         # Return debug information
+        error_traceback = traceback.format_exc()
         return f'''
         <h1>Error initializing database</h1>
         <p>Error: {str(e)}</p>
-        <pre>{import traceback; traceback.format_exc()}</pre>
+        <pre>{error_traceback}</pre>
         '''
 
 @app.route('/debug')
@@ -551,4 +553,4 @@ if __name__ == '__main__':
         db.create_all()
     
     # Run the app without SSL for easier debugging
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)
