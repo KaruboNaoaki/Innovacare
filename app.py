@@ -440,15 +440,57 @@ def dashboard():
         return render_template('admin_dashboard.html', now=current_datetime, timedelta=timedelta)
     elif current_user.role == 'doctor':
         patients = Patient.query.all()
+        
+        # Filter out patients with decryption errors
+        valid_patients = []
+        for patient in patients:
+            try:
+                # Test if we can decrypt the patient's name
+                first_name = patient.first_name
+                last_name = patient.last_name
+                
+                # If we get here, decryption worked
+                valid_patients.append(patient)
+            except Exception as e:
+                logger.error(f"Skipping patient {patient.id} due to decryption error: {e}")
+                # Skip this patient in the display
+        
         log_action('VIEW', 'Patient', 0, 'Listed all patients')
-        return render_template('doctor_dashboard.html', patients=patients, now=current_datetime)
+        
+        # Pass a flag to indicate if there are any decryption errors
+        decryption_errors = len(patients) > len(valid_patients)
+        
+        return render_template('doctor_dashboard.html', 
+                              patients=valid_patients, 
+                              now=current_datetime,
+                              decryption_errors=decryption_errors)
     elif current_user.role == 'patient':
         patient = Patient.query.filter_by(user_id=current_user.id).first()
         medical_records = []
+        
+        # Check if patient data is valid
+        patient_valid = True
         if patient:
-            medical_records = MedicalRecord.query.filter_by(patient_id=patient.id).all()
-            log_action('VIEW', 'MedicalRecord', patient.id, 'Viewed own medical records')
-        return render_template('patient_dashboard.html', patient=patient, medical_records=medical_records, now=current_datetime)
+            try:
+                # Test if we can decrypt the patient's name
+                first_name = patient.first_name
+                last_name = patient.last_name
+            except Exception as e:
+                logger.error(f"Decryption error for patient {patient.id}: {e}")
+                patient_valid = False
+            
+            if patient_valid:
+                try:
+                    medical_records = MedicalRecord.query.filter_by(patient_id=patient.id).all()
+                    log_action('VIEW', 'MedicalRecord', patient.id, 'Viewed own medical records')
+                except Exception as e:
+                    logger.error(f"Error retrieving medical records: {e}")
+        
+        return render_template('patient_dashboard.html', 
+                              patient=patient if patient_valid else None, 
+                              medical_records=medical_records, 
+                              now=current_datetime,
+                              decryption_error=patient and not patient_valid)
     else:
         return render_template('dashboard.html', now=current_datetime)
 
@@ -532,6 +574,126 @@ def logout():
 def profile():
     return render_template('profile.html', now=datetime.now())
 
+@app.route('/fix-default-patients')
+@login_required
+@role_required(['admin'])
+def fix_default_patients():
+    """Fix the default patients that have decryption errors"""
+    try:
+        # Find patient user
+        patient_user = User.query.filter_by(username='patient').first()
+        
+        if not patient_user:
+            return "Patient user not found. Run /init-db first.", 404
+        
+        # Check for existing patient records linked to this user
+        patients = Patient.query.filter_by(user_id=patient_user.id).all()
+        patients_fixed = 0
+        
+        for patient in patients:
+            try:
+                # Test if we can decrypt the patient data
+                try:
+                    first_name = patient.first_name
+                    last_name = patient.last_name
+                    # If we get here, decryption worked!
+                    continue
+                except Exception:
+                    # Decryption failed, we need to fix this patient
+                    pass
+                
+                # Re-create the patient data with current encryption
+                patient.first_name = "John"
+                patient.last_name = "Doe"
+                patient.dob = "1980-01-01"
+                patient.address = "123 Main St, Anytown, US"
+                patient.phone = "555-123-4567"
+                patients_fixed += 1
+                
+            except Exception as e:
+                logger.error(f"Error fixing patient {patient.id}: {e}")
+        
+        # Commit changes
+        db.session.commit()
+        
+        return f'''
+        <h1>Default Patient Fix Complete</h1>
+        <p>Checked {len(patients)} patient records linked to the default patient user.</p>
+        <p>Fixed {patients_fixed} patients with decryption errors.</p>
+        <p><a href="/dashboard">Return to Dashboard</a></p>
+        '''
+        
+    except Exception as e:
+        db.session.rollback()
+        error_msg = str(e)
+        logger.error(f"Failed to fix default patients: {error_msg}")
+        return f'''
+        <h1>Error Fixing Default Patients</h1>
+        <p>An error occurred: {error_msg}</p>
+        <p><a href="/dashboard">Return to Dashboard</a></p>
+        '''
+
+# Add a route to recreate all sample data
+@app.route('/recreate-default-data')
+@login_required
+@role_required(['admin'])
+def recreate_default_data():
+    """Recreate all default data with current encryption"""
+    try:
+        # Find default users
+        patient_user = User.query.filter_by(username='patient').first()
+        
+        if not patient_user:
+            return "Default users not found. Run /init-db first.", 404
+        
+        # Delete existing patient records for default users
+        default_patients = Patient.query.filter_by(user_id=patient_user.id).all()
+        for patient in default_patients:
+            # Also delete related medical records
+            MedicalRecord.query.filter_by(patient_id=patient.id).delete()
+            db.session.delete(patient)
+        
+        db.session.commit()
+        
+        # Create new default patient with current encryption
+        patient = Patient()
+        patient.user_id = patient_user.id
+        patient.first_name = "John"
+        patient.last_name = "Doe"
+        patient.dob = "1980-01-01"
+        patient.address = "123 Main St, Anytown, US"
+        patient.phone = "555-123-4567"
+        db.session.add(patient)
+        db.session.commit()
+        
+        # Add a sample medical record
+        record = MedicalRecord(
+            patient_id=patient.id,
+            doctor_id=User.query.filter_by(username='doctor').first().id,
+            record_type="Consultation"
+        )
+        record.diagnosis = "Seasonal allergies"
+        record.treatment = "Antihistamines as needed"
+        record.notes = "Patient reported feeling better after initial treatment"
+        db.session.add(record)
+        db.session.commit()
+        
+        return f'''
+        <h1>Default Data Recreated</h1>
+        <p>Successfully recreated all default patient data with current encryption.</p>
+        <p><a href="/dashboard">Return to Dashboard</a></p>
+        '''
+        
+    except Exception as e:
+        db.session.rollback()
+        error_msg = str(e)
+        logger.error(f"Failed to recreate default data: {error_msg}")
+        return f'''
+        <h1>Error Recreating Default Data</h1>
+        <p>An error occurred: {error_msg}</p>
+        <p><a href="/dashboard">Return to Dashboard</a></p>
+        '''
+
 @app.route('/migrate-data')
 @login_required
 @role_required(['admin'])
@@ -595,7 +757,7 @@ def migrate_data():
                 
                 records_migrated += 1
             except Exception as e:
-                logger.error(f"Failed to migrate record {record.id}: {e}")
+logger.error(f"Failed to migrate record {record.id}: {e}")
                 records_failed += 1
         
         # Commit all changes
@@ -702,7 +864,8 @@ def init_db():
             <li><strong>Doctor:</strong> username=doctor, password=doctor123</li>
             <li><strong>Patient:</strong> username=patient, password=patient123</li>
         </ul>
-        <p><strong>Important:</strong> If you encounter encryption errors, please use the <a href="/migrate-data">Data Migration Tool</a> (admin access required).</p>
+        <p><strong>Important:</strong> If you see decryption errors on the doctor dashboard, please use the 
+           <a href="/fix-default-patients">Fix Default Patients</a> or <a href="/recreate-default-data">Recreate Default Data</a> tool (admin access required).</p>
         <p><a href="/login">Go to login page</a></p>
         '''
     except Exception as e:
